@@ -233,6 +233,11 @@ class DiPlayActivity : ComponentActivity() {
             if (page == "home") startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
             else { page = "home"; render() }
         }, LinearLayout.LayoutParams(dp(130), dp(56)))
+        if (page == "home") {
+            header.addView(button(getString(R.string.exit_application), false) {
+                requestExitApplication()
+            }, LinearLayout.LayoutParams(dp(130), dp(56)))
+        }
         content.addView(header)
         content.addView(space(24))
         when (page) {
@@ -1934,6 +1939,19 @@ class DiPlayActivity : ComponentActivity() {
         typeface = if (bold) Typeface.create("sans-serif-medium", Typeface.NORMAL) else Typeface.create("sans-serif", Typeface.NORMAL)
         setLineSpacing(dp(3).toFloat(), 1f)
     }
+    /**
+     * Route the exit through the host so its full teardown chain (controller, sink, services)
+     * runs before the process is killed; the host handles EXTRA_EXIT_REQUEST in both
+     * onCreate and onNewIntent, so it works whether or not a host instance is alive.
+     */
+    private fun requestExitApplication() {
+        startActivity(
+            Intent(this, CarPlayHostActivity::class.java)
+                .putExtra(EXTRA_EXIT_REQUEST, true)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+        )
+    }
+
     private fun button(title: String, primary: Boolean, click: () -> Unit) = Button(this).apply {
         text = title; isAllCaps = false; textSize = 18f; setTextColor(if (primary) BG else TEXT)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)

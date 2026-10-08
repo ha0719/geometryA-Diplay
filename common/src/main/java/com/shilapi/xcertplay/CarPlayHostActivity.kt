@@ -30,6 +30,7 @@ import android.view.Surface
 import android.view.TextureView
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -93,6 +94,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val EXTRA_TRANSPORT_WIRELESS = "com.shilapi.xcertplay.TRANSPORT_WIRELESS"
+internal const val EXTRA_EXIT_REQUEST = "com.shilapi.xcertplay.EXIT_REQUEST"
 
 /**
  * Full-screen CarPlay host. It renders decoded video through a [TextureView], forwards touch to
@@ -380,6 +382,14 @@ class CarPlayHostActivity : ComponentActivity() {
     private var gestureTracking = false
     private var gestureStartX = 0f
     private var gestureStartY = 0f
+    // Five-tap exit burst state; primitives only so per-event detection stays allocation-free.
+    private var fiveTapCount = 0
+    private var fiveTapLastMs = 0L
+    private var fiveTapAnchorX = 0f
+    private var fiveTapAnchorY = 0f
+    private var fiveTapDownX = 0f
+    private var fiveTapDownY = 0f
+    private var touchSlopPx = -1
     private val shuttingDown = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val teardownExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -460,6 +470,10 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.getBooleanExtra(EXTRA_EXIT_REQUEST, false)) {
+            exitApplication()
+            return
+        }
         NavigationWidgetUpdater.attach(applicationContext)
         CenterMapOverlay.requestShow = ::showCenterMap
         MapMirrors.sink = mirrorSink
@@ -646,6 +660,10 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_EXIT_REQUEST, false)) {
+            exitApplication()
+            return
+        }
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED" && wirelessEnabled) {
             switchingTransport = true
             intent.removeExtra(EXTRA_TRANSPORT_WIRELESS)
@@ -3958,6 +3976,50 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun openSettingsMenu() = showDiPlayHome("settings")
 
+    /**
+     * Counts a same-area burst of real taps (down/up without movement or long-press). Returns true
+     * when the configured count is reached; resets the burst so it fires once per gesture run.
+     */
+    private fun recordFiveTapExit(event: MotionEvent): Boolean {
+        if (touchSlopPx < 0) touchSlopPx = ViewConfiguration.get(this).scaledTouchSlop
+        val moveDx = event.x - fiveTapDownX
+        val moveDy = event.y - fiveTapDownY
+        if (moveDx * moveDx + moveDy * moveDy > touchSlopPx * touchSlopPx ||
+            event.eventTime - event.downTime > FIVE_TAP_MAX_PRESS_MS
+        ) {
+            fiveTapCount = 0
+            return false
+        }
+        val clusterPx = dp(FIVE_TAP_CLUSTER_DP).toFloat()
+        if (fiveTapCount == 0 || event.eventTime - fiveTapLastMs > FIVE_TAP_INTERVAL_MS) {
+            fiveTapCount = 0
+            fiveTapAnchorX = event.x
+            fiveTapAnchorY = event.y
+        } else {
+            val anchorDx = event.x - fiveTapAnchorX
+            val anchorDy = event.y - fiveTapAnchorY
+            if (anchorDx * anchorDx + anchorDy * anchorDy > clusterPx * clusterPx) {
+                fiveTapCount = 0
+                fiveTapAnchorX = event.x
+                fiveTapAnchorY = event.y
+            }
+        }
+        fiveTapLastMs = event.eventTime
+        fiveTapCount += 1
+        if (fiveTapCount < FIVE_TAP_EXIT_COUNT) return false
+        fiveTapCount = 0
+        return true
+    }
+
+    /** Five-tap action: end the CarPlay session and return to the DiPlay app home. */
+    private fun exitCarPlayToAppHome() {
+        appendLog("Five-tap exit: ending CarPlay session")
+        Log.i(TAG, "five-tap exit to DiPlay home")
+        if (!shuttingDown.get()) shutdown(terminateProcess = false, reason = "five-tap exit")
+        showDiPlayHome()
+        finish()
+    }
+
     private fun saveSettingsAndReconnect() {
         if (!menuOpen) return
         if (!validateMfiSettings()) return
@@ -4051,8 +4113,11 @@ class CarPlayHostActivity : ComponentActivity() {
             MotionEvent.ACTION_DOWN -> {
                 gestureSequenceActive = false
                 gestureTracking = false
+                fiveTapDownX = event.x
+                fiveTapDownY = event.y
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                fiveTapCount = 0
                 if (event.pointerCount == THREE_FINGER_COUNT && !gestureSequenceActive) {
                     gestureSequenceActive = true
                     gestureTracking = true
@@ -4060,6 +4125,12 @@ class CarPlayHostActivity : ComponentActivity() {
                     gestureStartY = pointerCentroid(event, horizontal = false)
                     controller?.sendTouch(emptyList())
                     appendLog("Three-finger swipe tracking started")
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                if (!gestureSequenceActive && recordFiveTapExit(event)) {
+                    exitCarPlayToAppHome()
                     return true
                 }
             }
@@ -4656,6 +4727,10 @@ class CarPlayHostActivity : ComponentActivity() {
         const val TAG = "xcertplay-usb"
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
+        const val FIVE_TAP_EXIT_COUNT = 5
+        const val FIVE_TAP_INTERVAL_MS = 400L
+        const val FIVE_TAP_MAX_PRESS_MS = 400L
+        const val FIVE_TAP_CLUSTER_DP = 150
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val MAX_VISIBLE_LOG_LINES = 400
