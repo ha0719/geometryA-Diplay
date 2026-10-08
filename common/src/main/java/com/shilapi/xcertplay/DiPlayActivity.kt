@@ -302,7 +302,7 @@ class DiPlayActivity : ComponentActivity() {
         right.addView(label(getString(R.string.plug_your_iphone_into_a_usb_data_port_allow_carplay_when_y), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(dp(8), dp(10), dp(8), dp(24)) })
         right.addView(button(getString(R.string.settings), false) { page = "settings"; render() }, matchButton())
         right.addView(label(getString(R.string.make_diplay_feel_right_for_your_car), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, dp(24)) })
-        right.addView(label("${getString(R.string.home_public_preview)}${version()}", 12, MUTED).apply { trackedSpacing = .08f })
+        right.addView(label("${getString(R.string.home_public_preview)}${version()} By HA", 12, MUTED).apply { trackedSpacing = .08f })
         if (wide) {
             // Both rows share column widths. The USB button starts at the wireless
             // card's top edge, independently of hero wrapping or font scaling.
