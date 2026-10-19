@@ -487,6 +487,14 @@ class CarPlayHostActivity : ComponentActivity() {
             startActivity(Intent(this, DiPlayActivity::class.java))
             finish(); return
         }
+        // Safety net: a paused car data connection that survives here without a live session means
+        // a previous run died before restoring it; hand it back before anything else happens.
+        if (controller == null && !CarPlayBackgroundSession.hasSession() &&
+            com.shilapi.xcertplay.network.CarNetworkAutomation.dataPausedByUs(applicationContext) &&
+            com.shilapi.xcertplay.network.CarNetworkAutomation.restoreMobileData(applicationContext)
+        ) {
+            Log.i(TAG, "restored car mobile data at startup")
+        }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         initializeSessionLog()
         lastConfiguration = Configuration(resources.configuration)
@@ -3497,6 +3505,11 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeAirPlaySession = session
                     CarPlayBackgroundSession.active = true
+                    if (com.shilapi.xcertplay.network.CarNetworkAutomation.dataPauseEnabled(applicationContext) &&
+                        com.shilapi.xcertplay.network.CarNetworkAutomation.pauseMobileDataForProjection(applicationContext)
+                    ) {
+                        appendLog("Paused car mobile data for projection")
+                    }
                     if (hostUiDestroyed) return@runOnUiThread
                     reconnectAttempts = 0
                     lastFailureMessage = null
@@ -3532,6 +3545,15 @@ class CarPlayHostActivity : ComponentActivity() {
                 runOnUiThread {
                     if (activeAirPlaySession === session) activeAirPlaySession = null
                     CarPlayBackgroundSession.active = false
+                    // A dropped session usually reconnects; only hand the car its data back if
+                    // no session is live again shortly after the loss.
+                    mainHandler.postDelayed({
+                        if (activeAirPlaySession == null && !CarPlayBackgroundSession.hasSession() &&
+                            com.shilapi.xcertplay.network.CarNetworkAutomation.restoreMobileData(applicationContext)
+                        ) {
+                            appendLog("Restored car mobile data after session loss")
+                        }
+                    }, CAR_DATA_RESTORE_AFTER_LOSS_MILLIS)
                     if (hostUiDestroyed || menuOpen || controllerGeneration != restartGeneration) {
                         return@runOnUiThread
                     }
@@ -4073,6 +4095,9 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
         restartGeneration += 1
         mainHandler.removeCallbacks(applyDisplaySize)
+        if (com.shilapi.xcertplay.network.CarNetworkAutomation.restoreMobileData(applicationContext)) {
+            Log.i(TAG, "restored car mobile data during shutdown")
+        }
         val oldController = controller
         val oldSink = sink
         CarPlayMediaKeys.detach(oldController)
@@ -4731,6 +4756,7 @@ class CarPlayHostActivity : ComponentActivity() {
         const val FIVE_TAP_INTERVAL_MS = 400L
         const val FIVE_TAP_MAX_PRESS_MS = 400L
         const val FIVE_TAP_CLUSTER_DP = 150
+        const val CAR_DATA_RESTORE_AFTER_LOSS_MILLIS = 30_000L
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val MAX_VISIBLE_LOG_LINES = 400

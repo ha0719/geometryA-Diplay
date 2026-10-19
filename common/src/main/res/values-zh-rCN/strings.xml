@@ -251,6 +251,10 @@
     <string name="one_time_setup_on_this_car">在此车机上一次性设置</string>
     <string name="open">不加密</string>
     <string name="open_after_the_car_starts">车机启动后打开</string>
+    <string name="car_hotspot_auto_enable">自动开启车机热点</string>
+    <string name="car_hotspot_auto_enable_desc">连接时自动打开原车热点，适用于每次启动热点会被关闭的 4.x 车机</string>
+    <string name="car_data_pause_during_projection">投影时暂停车机数据流量</string>
+    <string name="car_data_pause_during_projection_desc">让热点只做局域网，手机自动改走自己的流量；CarPlay 断开后自动恢复车机数据</string>
     <string name="open_bluetooth">打开蓝牙</string>
     <string name="open_car_hotspot_settings">打开车机热点设置</string>
     <string name="open_car_settings">打开车机设置</string>

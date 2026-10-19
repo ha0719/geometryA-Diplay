@@ -1774,7 +1774,21 @@ class CarPlayController(
         if (hotspotMode == WirelessHotspotMode.MANUAL &&
             com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == false
         ) {
-            throw IOException("The car hotspot is off. Turn it on in the car settings and connect again.")
+            if (com.shilapi.xcertplay.network.CarNetworkAutomation.hotspotAutoEnableEnabled(appContext)) {
+                debugLog("car hotspot off; requesting automatic enable")
+                val accepted = com.shilapi.xcertplay.network.CarNetworkAutomation.requestHotspot(appContext, true)
+                val up = accepted &&
+                    com.shilapi.xcertplay.network.CarNetworkAutomation.awaitHotspotEnabled(appContext)
+                debugLog("car hotspot auto enable accepted=$accepted enabled=$up")
+                if (!up) {
+                    throw IOException(
+                        "The car hotspot is off and could not be enabled automatically. " +
+                            "Turn it on in the car settings and connect again.",
+                    )
+                }
+            } else {
+                throw IOException("The car hotspot is off. Turn it on in the car settings and connect again.")
+            }
         }
         val manager: WirelessHotspotManager = when (hotspotMode) {
             WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog)

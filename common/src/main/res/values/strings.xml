@@ -252,6 +252,10 @@
     <string name="one_time_setup_on_this_car">One-time setup on this car</string>
     <string name="open">Open</string>
     <string name="open_after_the_car_starts">Open after the car starts</string>
+    <string name="car_hotspot_auto_enable">Auto-enable car hotspot</string>
+    <string name="car_hotspot_auto_enable_desc">Turn the OEM hotspot on automatically when connecting; for 4.x head units that reset it to off at boot</string>
+    <string name="car_data_pause_during_projection">Pause car data while projecting</string>
+    <string name="car_data_pause_during_projection_desc">Keeps the hotspot local-only so the iPhone uses its own cellular; car data is restored when CarPlay disconnects</string>
     <string name="open_bluetooth">Open Bluetooth</string>
     <string name="open_car_hotspot_settings">Open car hotspot settings</string>
     <string name="open_car_settings">Open car settings</string>

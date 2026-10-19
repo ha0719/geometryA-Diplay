@@ -376,6 +376,13 @@ class DiPlayActivity : ComponentActivity() {
         section(content, getString(R.string.automatic_connection), R.drawable.ic_dp_automation) { card ->
             toggle(card, getString(R.string.connect_when_diplay_opens), getString(R.string.use_your_last_connection_type_and_selected_iphone), DiPlayPreferences.autoConnect(this)) { DiPlayPreferences.saveAutoConnect(this, it) }
             toggle(card, getString(R.string.open_after_the_car_starts), getString(R.string.availability_depends_on_your_head_unit_s_startup_settings), AirPlayPersistence.loadAutoStartOnBoot(this)) { AirPlayPersistence.saveAutoStartOnBoot(this, it) }
+            toggle(card, getString(R.string.car_hotspot_auto_enable), getString(R.string.car_hotspot_auto_enable_desc), com.shilapi.xcertplay.network.CarNetworkAutomation.hotspotAutoEnableEnabled(this)) {
+                com.shilapi.xcertplay.network.CarNetworkAutomation.saveHotspotAutoEnableEnabled(this, it)
+            }
+            toggle(card, getString(R.string.car_data_pause_during_projection), getString(R.string.car_data_pause_during_projection_desc), com.shilapi.xcertplay.network.CarNetworkAutomation.dataPauseEnabled(this)) { enabled ->
+                com.shilapi.xcertplay.network.CarNetworkAutomation.saveDataPauseEnabled(this, enabled)
+                if (!enabled) com.shilapi.xcertplay.network.CarNetworkAutomation.restoreMobileData(this)
+            }
             card.addView(button(selectedPhoneButtonLabel(), false) { choosePhone() }, matchButton(12, 60))
         }
         section(content, getString(R.string.display_and_performance), R.drawable.ic_dp_display) { card ->
